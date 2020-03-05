@@ -2,28 +2,27 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 var last_qr = "";
-const {Client, Location} = require('whatsapp-web.js');
-const {parse} = require('querystring');
+const { Client, Location } = require('whatsapp-web.js');
+const { parse } = require('querystring');
 const SESSION_FILE_PATH = './session.json';
 let sessionCfg;
-if(fs.existsSync(SESSION_FILE_PATH))
-{
+if (fs.existsSync(SESSION_FILE_PATH)) {
     sessionCfg = require(SESSION_FILE_PATH);
 }
 
-const client = new Client({pupeteer: {headless: true}, session: sessionCfg});
+const client = new Client({ pupeteer: { headless: true }, session: sessionCfg });
 
 client.initialize();
 
-client.on('qr', (qr)=>{
+client.on('qr', (qr) => {
     last_qr = qr;
 });
 
-client.on('authenticated', (session) =>{
+client.on('authenticated', (session) => {
     console.log("AUTH!", session);
     sessionCfg = session;
-    fs.writeFile(SESSION_FILE_PATH, JSON.stringify(session), function(err){
-        if(err){
+    fs.writeFile(SESSION_FILE_PATH, JSON.stringify(session), function(err) {
+        if (err) {
             console.error(err);
         }
     })
@@ -34,55 +33,45 @@ client.on('disconnected', (reason) => {
 
 const server = http.createServer();
 
-server.on('request', async (req, res) => {
+server.on('request', async(req, res) => {
     console.log("URL", req.url);
-    if(req.url === "/get_qr")
-    {
+    if (req.url === "/get_qr") {
         console.log("QR", last_qr);
-       if(last_qr !== "")
-       {
-           res.end(JSON.stringify({'success':true, 'data': last_qr}));
-       }
-       res.end(JSON.stringify({'success':false,'data':'There is no qr code available (try again later)'}));
-    }
-    else if(req.url === "/state")
-    {
-        client.getState().then((state)=>{
-            res.end(JSON.stringify({'success':true, 'data':state}))
-        }).catch(()=>{
-            if(last_qr !== "")
-            {
-                res.end(JSON.stringify({'success':true, 'data': 'ks_login_needed'}))
+        if (last_qr !== "") {
+            res.end(JSON.stringify({ 'Success': true, 'Content': last_qr }));
+        }
+        res.end(JSON.stringify({ 'Success': false, 'Content': 'There is no qr code available (try again later)' }));
+    } else if (req.url === "/state") {
+        client.getState().then((state) => {
+            res.end(JSON.stringify({ 'Success': true, 'Content': state }))
+        }).catch(() => {
+            if (last_qr !== "") {
+                res.end(JSON.stringify({ 'Success': true, 'Content': 'ks_login_needed' }))
             }
-            res.end(JSON.stringify({'success':false, 'data':'failed to get state!'}))
+            res.end(JSON.stringify({ 'Success': false, 'Content': 'failed to get state!' }))
         })
-    }
-    else if(req.url === "/get_chat")
-    {
+    } else if (req.url === "/get_chat") {
         let body = '';
         req.on('data', async(chunk) => {
             body += chunk.toString();
         })
-        req.on('end', async()=>{
+        req.on('end', async() => {
             let bodyParsed = parse(body);
 
             let chat_id = bodyParsed['chat_id'];
-            if(chat_id === undefined)
-            {
-                res.end(JSON.stringify({"success":false, "data": "Missing data!"}));
+            if (chat_id === undefined) {
+                res.end(JSON.stringify({ "Success": false, "Content": "Missing data!" }));
             }
             console.log("chat_id", chat_id);
 
             client.getChatById(chat_id).then((chat) => {
-                res.end(JSON.stringify({'success':true, 'data':chat}));
-            }).catch(()=>{
+                res.end(JSON.stringify({ 'Success': true, 'Content': "Returned chat!", 'AddonData': JSON.stringify(chat) }));
+            }).catch(() => {
                 console.error("getchaterror")
-                res.end(JSON.stringify({'success':false}))
+                res.end(JSON.stringify({ 'Success': false }))
             })
         })
-    }
-    else if(req.url === "/get_messages")
-    {
+    } else if (req.url === "/get_messages") {
         let body = '';
         req.on('data', async(chunk) => {
             body += chunk.toString();
@@ -92,30 +81,27 @@ server.on('request', async (req, res) => {
 
             let chat_id = bodyParsed['chat_id'];
             let messages_count = bodyParsed['messages_count'];
-            if(chat_id === undefined || messages_count === undefined)
-            {
-                res.end(JSON.stringify({"success":false, "data":"Missing data!"}));
+            if (chat_id === undefined || messages_count === undefined) {
+                res.end(JSON.stringify({ "Success": false, "Content": "Missing data!" }));
             }
-            console.log("chat_id",chat_id);
+            console.log("chat_id", chat_id);
             console.log("messages_count", messages_count);
-            
-            client.getChatById(chat_id).then((chat)=>{
-                client.sendSeen(chat_id);
-                chat.fetchMessages({limit: parseInt(messages_count)}).then((messages) => {
 
-                    res.end(JSON.stringify({'success':true, 'data': messages}))
-                }).catch(()=>{
+            client.getChatById(chat_id).then((chat) => {
+                client.sendSeen(chat_id);
+                chat.fetchMessages({ limit: parseInt(messages_count) }).then((messages) => {
+
+                    res.end(JSON.stringify({ 'Success': true, 'Content': "Returned messages", 'AddonData': JSON.stringify(messages) }))
+                }).catch(() => {
                     console.error("Error fetchmessages");
-                    res.end(JSON.stringify({'success': false, 'data':'failedfetchmessages'}))
+                    res.end(JSON.stringify({ 'Success': false, 'Content': 'failedfetchmessages' }))
                 })
-            }).catch(()=>{
+            }).catch(() => {
                 console.error("Error getchatbyid");
-                res.end(JSON.stringify({'success':false,'data':"failedgetchatbyid"}));
+                res.end(JSON.stringify({ 'Success': false, 'Content': "failedgetchatbyid" }));
             })
         })
-    }
-    else if(req.url === "/send_message")
-    {
+    } else if (req.url === "/send_message") {
         let body = '';
         req.on('data', async(chunk) => {
             body += chunk.toString();
@@ -125,26 +111,26 @@ server.on('request', async (req, res) => {
 
             let chat_id = bodyParsed['chat_id'];
             let message = bodyParsed['message'];
-            if(chat_id === undefined || message === undefined)
-            {
-                res.end(JSON.stringify({"success":false, "data":"Missing data!"}));
+            if (chat_id === undefined || message === undefined) {
+                res.end(JSON.stringify({ "Success": false, "Content": "Missing data!" }));
             }
-            console.log("chat_id",chat_id);
+            console.log("chat_id", chat_id);
             console.log("message", message);
-            
-            client.getChatById(chat_id).then((chat)=>{
+
+            client.getChatById(chat_id).then((chat) => {
                 chat.sendMessage(message).then((msg) => {
-                    res.end(JSON.stringify({'success':true,'data':msg}))
-                })
-                .catch(()=>{
-                    console.error("error sendmessage");
-                    res.end(JSON.stringify({'success':false, 'data':'failedsendmessage'}))
-                })
-            }).catch(()=>{
+                        console.log(msg);
+                        res.end(JSON.stringify({ 'Success': true, 'Content': "Returned message!", 'AddonData': JSON.stringify(msg) }))
+                    })
+                    .catch(() => {
+                        console.error("error sendmessage");
+                        res.end(JSON.stringify({ 'Success': false, 'Content': 'failedsendmessage' }))
+                    })
+            }).catch(() => {
                 console.error("Error getchatbyid");
-                res.end(JSON.stringify({'success':false,'data':"failedgetchatbyid"}));
+                res.end(JSON.stringify({ 'Success': false, 'Content': "failedgetchatbyid" }));
             })
         })
     }
 })
-server.listen(5002,"localhost");
+server.listen(5002, "localhost");
