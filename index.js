@@ -71,6 +71,8 @@ server.on('request', async(req, res) => {
                 res.end(JSON.stringify({ 'Success': false }))
             })
         })
+    } else if (req.url === "/get_info") {
+        res.end(JSON.stringify({ "Success": true, "Content": "Returned info", "AddonData": JSON.stringify(client.info) }));
     } else if (req.url === "/get_messages") {
         let body = '';
         req.on('data', async(chunk) => {
@@ -90,14 +92,14 @@ server.on('request', async(req, res) => {
             client.getChatById(chat_id).then((chat) => {
                 client.sendSeen(chat_id);
                 chat.fetchMessages({ limit: parseInt(messages_count) }).then((messages) => {
-
+                    console.log("messages", messages);
                     res.end(JSON.stringify({ 'Success': true, 'Content': "Returned messages", 'AddonData': JSON.stringify(messages) }))
-                }).catch(() => {
-                    console.error("Error fetchmessages");
+                }).catch((ex) => {
+                    console.error("Error fetchmessages", ex);
                     res.end(JSON.stringify({ 'Success': false, 'Content': 'failedfetchmessages' }))
                 })
-            }).catch(() => {
-                console.error("Error getchatbyid");
+            }).catch((ex) => {
+                console.error("Error getchatbyid", ex);
                 res.end(JSON.stringify({ 'Success': false, 'Content': "failedgetchatbyid" }));
             })
         })
@@ -126,8 +128,8 @@ server.on('request', async(req, res) => {
                         console.error("error sendmessage");
                         res.end(JSON.stringify({ 'Success': false, 'Content': 'failedsendmessage' }))
                     })
-            }).catch(() => {
-                console.error("Error getchatbyid");
+            }).catch((ex) => {
+                console.error("Error getchatbyid", ex);
                 res.end(JSON.stringify({ 'Success': false, 'Content': "failedgetchatbyid" }));
             })
         })
