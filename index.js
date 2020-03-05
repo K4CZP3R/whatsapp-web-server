@@ -43,13 +43,19 @@ server.on('request', async (req, res) => {
        {
            res.end(JSON.stringify({'success':true, 'data': last_qr}));
        }
-       res.end(JSON.stringify({'success':false,'data':false}));
+       res.end(JSON.stringify({'success':false,'data':'There is no qr code available (try again later)'}));
     }
     else if(req.url === "/state")
     {
-        const state = await client.getState();
-        console.log("STATE", state);
-        res.end(JSON.stringify({'success':true,'data':state}));
+        client.getState().then((state)=>{
+            res.end(JSON.stringify({'success':true, 'data':state}))
+        }).catch(()=>{
+            if(last_qr !== "")
+            {
+                res.end(JSON.stringify({'success':true, 'data': 'ks_login_needed'}))
+            }
+            res.end(JSON.stringify({'success':false, 'data':'failed to get state!'}))
+        })
     }
     else if(req.url === "/get_chat")
     {
@@ -141,4 +147,4 @@ server.on('request', async (req, res) => {
         })
     }
 })
-server.listen(3000);
+server.listen(5002,"localhost");
